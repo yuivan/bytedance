@@ -14,16 +14,20 @@
   </body>
   <script>
     function enableDrag(element) {
+      //mousedown的坐标
       let x0, y0;
+      //上一次的坐标
       let ex = 0,
         ey = 0;
       let move = (e) => {
+        //移动的x，y
         let [dx, dy] = [e.clientX - x0, e.clientY - y0];
         element.style.transform = `translate(${ex + dx}px,${ey + dy}px)`;
       };
       let up = (e) => {
         document.removeEventListener("mousemove", move);
         document.removeEventListener("mouseup", up);
+        //移动的x，y
         let [dx, dy] = [e.clientX - x0, e.clientY - y0];
         element.style.transform = `translate(${ex + dx}px,${ey + dy}px)`;
         ex += dx;
