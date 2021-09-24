@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <title>Document</title>
+  </head>
+  <script>
+    //dpr
+    (function () {
+      var metaEl = document.createElement("meta");
+      var scale = devicePixelRatio;
+      metaEl.setAttribute("name", "viewport");
+      metaEl.setAttribute(
+        "content",
+        "initial-scale=" +
+          1 / scale +
+          ", maximum-scale=" +
+          1 / scale +
+          ", minimum-scale=" +
+          1 / scale +
+          ", user-scalable=no"
+      );
+      document.documentElement.firstElementChild.appendChild(metaEl);
+    })();
+
+    //root em 设置
+    //已经可以使用vw vh,可以不用rem
+    (function () {
+      var doc = document.documentElement;
+      //1rem = 屏幕的1/15
+      doc.style.fontSize = window.innerWidth / 15 + "px";
+    });
+    //理想视口宽度  分辨率/dpr 就是设备宽度
+    console.log(window.screen.width);
+    console.log(window.screen);
+    //视觉窗口 理想窗口宽度/缩放比例
+    console.log(document.documentElement.clientWidth);
+  </script>
+  <style>
+    .test {
+      width: 20rem;
+      height: 20rem;
+      background-color: red;
+    }
+  </style>
+  <body>
+    <div class="test"></div>
+  </body>
+  <script>
+    //像素比  原先1px的内容放大到devicePixelRatio px 显示
+    console.log(window.devicePixelRatio);
+  </script>
+</html>

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <style>
+    #box {
+      width: 200px;
+      height: 200px;
+      background-color: red;
+    }
+  </style>
+  <body>
+    <div id="box"></div>
+  </body>
+  <script>
+    function enableLongTap(ele) {
+      let event = new CustomEvent("longPress");
+      let timer = 0;
+      let isLongTap = false;
+      ele.addEventListener("mousedown", () => {
+        isLongTap = true;
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+          ele.dispatchEvent(event);
+        }, 500);
+        let move = () => {
+          console.log("move");
+        };
+        let end = () => {
+          clearTimeout(timer);
+          document.removeEventListener("mousemove", move);
+          document.removeEventListener("mouseup", end);
+        };
+        document.addEventListener("mousemove", move);
+        document.addEventListener("mouseup", end);
+      });
+    }
+    {
+      let box = document.getElementById("box");
+      enableLongTap(box);
+      box.addEventListener("longPress", () => {
+        console.log("长按");
+      });
+    }
+  </script>
+</html>
