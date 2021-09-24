@@ -1,0 +1,278 @@
+<div id="app">{{title}}</div>
+<script>
+  function h(tag, props, children) {
+    return {
+      tag,
+      props,
+      children,
+    };
+  }
+</script>
+<script>
+  Vue = {
+    //扩展性
+    createRenderer(rendererOptions) {
+      return {
+        createApp(options) {
+          return {
+            mount(select) {
+              console.log(
+                rendererOptions.querySelector,
+                select,
+                rendererOptions.querySelector("app")
+              );
+              const parent = rendererOptions.querySelector(select);
+              console.log(select);
+              if (!options.render) {
+                options.render = this.compile(parent.innerHTML);
+              }
+              // setup和其他选项
+              if (options.data) {
+                this.data = options.data();
+              }
+              if (options.setup) {
+                this.setupState = options.setup();
+              }
+
+              const proxy = new Proxy(this, {
+                get(target, key) {
+                  if (
+                    target.setupState &&
+                    key in target.setupState &&
+                    typeof target.setupState === "object"
+                  ) {
+                    return target.setupState[key];
+                  } else {
+                    return target.data[key];
+                  }
+                },
+                set(target, key, value) {
+                  if (
+                    target.setupState &&
+                    key in target.setupState &&
+                    typeof target.setupState === "object"
+                  ) {
+                    target.setupState[key] = value;
+                  } else {
+                    target.data[key] = value;
+                  }
+                },
+              });
+              effect(() => {
+                // const el = options.render.call(proxy);
+                // parent.innerHTML = "";
+                // rendererOptions.appendChild(parent, el);
+                const vNode = options.render.call(proxy);
+                if (!this.isMounted) {
+                  const el = this.createElm(vNode);
+                  console.log(el);
+                  parent.innerHTML = "";
+                  rendererOptions.appendChild(parent, el);
+                  this.isMounted = true;
+                } else {
+                  //update
+                  this.patch(this._vNode, vNode);
+                }
+
+                this._vNode = vNode;
+              });
+            },
+            patch(n1, n2) {
+              if (n1.tag === n2.tag && n1.key === n2.key) {
+                const el = (n2.el = n1.el);
+                //update
+                const oldCh = n1.children;
+                const newCh = n2.children;
+                if (typeof oldCh === "string") {
+                  if (typeof newCh === "string") {
+                    el.textContent = newCh;
+                  } else {
+                    el.textContent = "";
+                    newCh.forEach((child) =>
+                      rendererOptions.appendChild(el, this.createElm(child))
+                    );
+                  }
+                } else {
+                  if (typeof newCh === "string") {
+                    el.textContent = newCh;
+                  } else {
+                    //updateChildren
+                    this.updateChildren(el, oldCh, newCh);
+                  }
+                }
+              } else {
+                //replace
+              }
+            },
+            updateChildren(parent, oldChildren, newChildren) {
+              const len = Math.min(oldChildren.length, newChildren.length);
+
+              for (let i = 0; i < len; i++) {
+                this.patch(oldChildren[i], newChildren[i]);
+              }
+              //新的多 新增
+              if (newChildren.length > oldChildren.length) {
+                for (let i = oldChildren.length; i < newChildren.length; i++) {
+                  rendererOptions.appendChild(
+                    parent,
+                    this.createElm(newChildren[i])
+                  );
+                }
+              }
+              //删除
+              if (newChildren.length < oldChildren.length) {
+                for (let i = newChildren.length; i < oldChildren.length; i++) {
+                  rendererOptions.remove(parent, oldChildren[i].el);
+                }
+              }
+            },
+            component() {},
+            createElm(vNode) {
+              const { tag, props, children } = vNode;
+              const el = rendererOptions.createElement(tag);
+              if (typeof children === "string") {
+                el.textContent = children;
+              } else {
+                children.forEach((childNode) => {
+                  rendererOptions.appendChild(el, this.createElm(childNode));
+                });
+              }
+              vNode.el = el;
+              return el;
+            },
+            compile(template) {
+              return function render() {
+                if (Array.isArray(this.title)) {
+                  childNode = this.title.map((s) => h("p", {}, s));
+                  return h("h3", {}, childNode);
+                } else {
+                  return h("h3", {}, this.title);
+                }
+              };
+            },
+          };
+        },
+      };
+    },
+    createApp(options) {
+      const renderer = Vue.createRenderer({
+        querySelector(select) {
+          return document.querySelector(select);
+        },
+        appendChild(parent, child) {
+          parent.appendChild(child);
+        },
+        createElement(element) {
+          return document.createElement(element);
+        },
+        remove(parent, child) {
+          parent.removeChild(child);
+        },
+      });
+      return renderer.createApp(options);
+    },
+  };
+</script>
+<script>
+  //能够拦截用户对代理对象的访问
+  //在值发生变化的时候，做出响应
+  function reactive(obj) {
+    //vue2 defineProperty
+    //
+    //性能差 递归遍历obj所有的key ，而proxy是运行时代理的
+    //数组有问题  单独一套实现
+    //api有影响  vue set/delete defineProperty无法拦截动态属性,所以需要单独api重新设置新的属性
+    //总结 性能/api/内部实现/数据结构支持 map等不支持
+    //proxy  问题：兼容性问题  ie11不支持
+
+    return new Proxy(obj, {
+      get(target, key) {
+        //建立依赖关系
+        track(target, key);
+        return target[key];
+      },
+      set(target, key, value) {
+        target[key] = value;
+        //获取依赖关系触发
+        trigger(target, key);
+      },
+    });
+  }
+
+  //调用effect，fn立刻执行
+  const targetMap = {};
+  const effectStack = [];
+  function effect(fn) {
+    const eff = function () {
+      try {
+        effectStack.push(eff);
+        fn();
+      } finally {
+        effectStack.pop();
+      }
+    };
+    eff();
+    return eff;
+  }
+  //建立target key和effectstack中存储的副作用的
+  function track(target, key) {
+    const effect = effectStack[effectStack.length - 1];
+    let map = targetMap[target];
+    if (!map) {
+      map = {};
+      targetMap[target] = map;
+    }
+    if (key in map) {
+      let deps = map[key];
+      if (!deps.includes(effect)) {
+        deps.push(effect);
+      }
+    } else {
+      map[key] = [effect];
+    }
+  }
+  function trigger(target, key) {
+    const list = targetMap[target][key];
+    if (list) {
+      list.forEach((dep) => dep());
+    }
+  }
+
+  //   let foo = reactive({ title: "fooTitle" });
+
+  //   effect(() => {
+  //     console.log(foo.title);
+  //     console.log(foo.title);
+  //   });
+  //   foo.title = "hello yyf";
+  //   setTimeout(() => {
+  //     foo.title = "yyf22";
+  //   }, 3000);
+</script>
+<script>
+  //app实例创建
+  //new Vue
+  const app = Vue.createApp({
+    data() {
+      return {
+        title: "hello vue3!",
+      };
+    },
+    setup() {
+      //   const state = {
+      //     title: "hell",
+      //   };
+      const state = reactive({
+        title: ["vue3 hello!", "vue3 hello 2"],
+      });
+      setTimeout(() => {
+        state.title = ["vue3 hello aa", "vue3 dd", "vue hello3"];
+      }, 3000);
+      return state;
+    },
+  });
+  app.component("comp", {
+    template: "",
+  });
+  app.mount("#app");
+</script>
